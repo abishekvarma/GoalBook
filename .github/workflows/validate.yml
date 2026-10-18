@@ -19,7 +19,11 @@ jobs:
           python-version: "3.12"
       - name: Check frontend JavaScript syntax
         run: node --check public/app.js
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
       - name: Check Python syntax
         run: python -m py_compile api/index.py tests/test_api.py
-      - name: Check JSON configuration
+      - name: Run API smoke tests
+        run: python -m unittest discover -s tests -v
+      - name: Validate JSON configuration
         run: python -c "import json; json.load(open('vercel.json')); json.load(open('public/manifest.webmanifest'))"
