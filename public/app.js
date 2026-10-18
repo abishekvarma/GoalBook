@@ -30,6 +30,8 @@ $('photoDate').value=today();$('photoForm').addEventListener('submit',e=>{e.prev
 $('exportBtn').onclick=()=>{const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='project-physique-40-backup-'+today()+'.json';a.click();URL.revokeObjectURL(a.href)};
 $('importBtn').onclick=()=>$('importFile').click();$('importFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const d=JSON.parse(await f.text());if(!d||!Array.isArray(d.foods)||!Array.isArray(d.weights))throw Error('Not a Project Physique 40 backup');if(confirm('Replace current local data with this backup?')){state={...blank(),...d};save()}}catch(err){alert('Could not import this backup: '+err.message)}e.target.value=''};
 $('resetBtn').onclick=()=>{if(confirm('Permanently delete all Project Physique 40 data saved in this browser? Export a backup first if needed.')){state=blank();save()}};
+const weeklyPlanBox=$('weeklyWorkoutPlanText'); if(weeklyPlanBox) weeklyPlanBox.value=state.settings.workoutPlan||'';
+$('saveWeeklyWorkoutPlan')?.addEventListener('click',()=>{const plan=$('weeklyWorkoutPlanText').value.trim();if(!plan){alert('Paste your full Monday–Sunday workout plan first.');return;}state.settings.workoutPlan=plan;save();$('weeklyWorkoutPlanStatus').textContent='Weekly workout plan saved on this device.';});
 if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('/sw.js').catch(()=>{});
 render();
 })();
