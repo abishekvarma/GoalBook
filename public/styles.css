@@ -4,3 +4,5 @@
 
 #exerciseForm{display:none!important}
 #plannedWorkout h4{margin:0 0 10px;font-size:1rem}#plannedWorkout p{margin:7px 0;line-height:1.45}
+
+.guided-list{display:grid;gap:10px;margin:14px 0}.guided-exercise{display:flex;gap:12px;align-items:flex-start;border:1px solid #364033;border-radius:14px;padding:13px}.guided-exercise input{width:24px;height:24px;flex:0 0 24px;accent-color:#b9f36b}.guided-exercise span{display:grid;gap:5px}.guided-exercise input:checked+span strong{text-decoration:line-through;opacity:.6}.session-duration{display:grid;gap:10px;margin:18px 0}
