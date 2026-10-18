@@ -140,8 +140,52 @@ function planForToday(plan){
  const rest=/\brest\b|recovery/i.test(items.slice(1).map(x=>x.replace(/<[^>]*>/g,'')).join(' '));
  return items.join('')+(rest?'<p class="hint">Recovery day — no strength workout planned.</p>':'');
 }
-$('foodForm').addEventListener('submit',e=>{e.preventDefault();state.foods.push({id:crypto.randomUUID(),date:today(),name:$('foodName').value.trim(),grams:Number($('foodGrams').value),state:$('foodState').value,calories:Number($('foodCalories').value),protein:Number($('foodProtein').value),carbs:Number($('foodCarbs').value),fat:Number($('foodFat').value),offPlan:$('foodOffPlan').checked});e.target.reset();$('foodGrams').value=100;$('foodCalories').value=0;$('foodProtein').value=0;$('foodCarbs').value=0;$('foodFat').value=0;save()});
-$('foodSearch').addEventListener('input',()=>{const q=$('foodSearch').value.toLowerCase();const matches=starter.filter(x=>x.name.toLowerCase().includes(q)).slice(0,8);$('foodSuggestions').innerHTML=q?matches.map((x,i)=>'<button class="suggestion" data-food-pick="'+i+'"><span>'+esc(x.name)+'<small>'+x.state+' · per 100 g</small></span><strong>'+x.cal+' kcal</strong></button>').join(''):'Type to search starter foods';document.querySelectorAll('[data-food-pick]').forEach(b=>b.onclick=()=>{const x=matches[Number(b.dataset.foodPick)];$('foodName').value=x.name;$('foodState').value=x.state;$('foodGrams').value=100;$('foodCalories').value=x.cal;$('foodProtein').value=x.p;$('foodCarbs').value=x.c;$('foodFat').value=x.f;$('foodGrams').focus()})});
+$('foodForm').addEventListener('submit',e=>{e.preventDefault();const calories=Number($('foodCalories').value),protein=Number($('foodProtein').value),carbs=Number($('foodCarbs').value),fat=Number($('foodFat').value);if([calories,protein,carbs,fat].some(v=>!Number.isFinite(v)||v<0)){alert('Please check the nutrition values before saving.');return;}state.foods.push({id:crypto.randomUUID(),date:today(),name:$('foodName').value.trim(),grams:Number($('foodGrams').value),state:$('foodState').value,calories,protein,carbs,fat,offPlan:$('foodOffPlan').checked});e.target.reset();$('foodGrams').value=100;$('foodCalories').value=0;$('foodProtein').value=0;$('foodCarbs').value=0;$('foodFat').value=0;$('foodNutritionStatus').textContent='';save()});
+let foodSearchTimer;
+function applyFoodNutrition(food){
+  const grams=Math.max(0,Number($('foodGrams').value)||100),factor=grams/100;
+  $('foodName').value=food.name;$('foodState').value=food.state||'Packaged';
+  $('foodCalories').value=Math.round((food.cal||0)*factor*10)/10;
+  $('foodProtein').value=Math.round((food.p||0)*factor*10)/10;
+  $('foodCarbs').value=Math.round((food.c||0)*factor*10)/10;
+  $('foodFat').value=Math.round((food.f||0)*factor*10)/10;
+  $('foodNutritionStatus').textContent='Nutrition filled for '+grams+' g. Check raw/cooked state and verify unusual or branded foods.';
+}
+function nutritionButton(food,index,source){return '<button class="suggestion" data-food-pick="'+index+'" data-food-source="'+source+'"><span>'+esc(food.name)+'<small>'+(food.state||'Packaged')+' · per 100 g</small></span><strong>'+Math.round(food.cal||0)+' kcal</strong></button>'}
+$('foodSearch').addEventListener('input',()=>{
+ const q=$('foodSearch').value.trim().toLowerCase();clearTimeout(foodSearchTimer);
+ const matches=starter.filter(x=>x.name.toLowerCase().includes(q)).slice(0,8);
+ $('foodSuggestions').innerHTML=q?matches.map((x,i)=>nutritionButton(x,i,'local')).join(''):'Type to search foods';
+ document.querySelectorAll('[data-food-pick][data-food-source="local"]').forEach(b=>b.onclick=()=>applyFoodNutrition(matches[Number(b.dataset.foodPick)]));
+ if(q.length<3||matches.length){if(q.length<3)return;}
+ foodSearchTimer=setTimeout(async()=>{
+  $('foodSuggestions').insertAdjacentHTML('beforeend','<p class="hint">Searching food database…</p>');
+  try{
+   const url='https://world.openfoodfacts.org/cgi/search.pl?search_terms='+encodeURIComponent(q)+'&search_simple=1&action=process&json=1&page_size=8&fields=product_name,nutriments';
+   const response=await fetch(url,{headers:{Accept:'application/json'}});
+   if(!response.ok)throw new Error('lookup unavailable');
+   const data=await response.json();
+   const remote=(data.products||[]).filter(p=>p.product_name&&p.nutriments&&Number.isFinite(Number(p.nutriments['energy-kcal_100g']))).map(p=>({name:p.product_name,state:'Packaged',cal:Number(p.nutriments['energy-kcal_100g'])||0,p:Number(p.nutriments.proteins_100g)||0,c:Number(p.nutriments.carbohydrates_100g)||0,f:Number(p.nutriments.fat_100g)||0}));
+   const valid=remote.slice(0,8);
+   if(valid.length){
+    const current=$('foodSuggestions');
+    const remoteHtml=valid.map((x,i)=>nutritionButton(x,i,'remote')).join('');
+    current.innerHTML=(matches.length?matches.map((x,i)=>nutritionButton(x,i,'local')).join(''):'')+'<p class="hint">Database results · packaged products may differ from plain ingredients.</p>'+remoteHtml;
+    document.querySelectorAll('[data-food-pick]').forEach(b=>b.onclick=()=>{const list=b.dataset.foodSource==='local'?matches:valid;applyFoodNutrition(list[Number(b.dataset.foodPick)])});
+   } else if(!matches.length){$('foodSuggestions').textContent='No matching nutrition data found. Try “white rice raw”, “cooked rice”, or check the package label.';}
+  }catch(_){if(!matches.length)$('foodSuggestions').textContent='Online lookup unavailable. Try the built-in foods or enter values from the food label.';}
+ },350);
+});
+$('foodGrams').addEventListener('change',()=>{
+ const name=$('foodName').value.trim().toLowerCase();
+ const item=starter.find(x=>x.name.toLowerCase()===name);
+ if(item)applyFoodNutrition(item);
+});
+$('foodName').addEventListener('change',()=>{
+ const name=$('foodName').value.trim().toLowerCase();
+ const item=starter.find(x=>x.name.toLowerCase()===name);
+ if(item)applyFoodNutrition(item);
+});
 $('clearFoodBtn').onclick=()=>{if(confirm('Clear only today’s food entries?')){state.foods=state.foods.filter(x=>x.date!==today());save()}};
 $('exerciseForm').addEventListener('submit',e=>{e.preventDefault();state.exercises.push({id:crypto.randomUUID(),date:today(),name:$('exerciseName').value.trim(),sets:Number($('exerciseSets').value),reps:$('exerciseReps').value.trim(),weight:Number($('exerciseWeight').value),notes:$('exerciseNotes').value.trim()});e.target.reset();$('exerciseSets').value=3;$('exerciseReps').value='12, 12, 10';$('exerciseWeight').value=0;save()});$('clearWorkoutBtn').onclick=()=>{if(confirm('Clear today’s workout entries?')){state.exercises=state.exercises.filter(x=>x.date!==today());save()}};
 $('openWeightNotebook')?.addEventListener('click',()=>{const n=$('weightNotebook');n.hidden=!n.hidden;$('openWeightNotebook').textContent=n.hidden?'📘 Open weight history notebook':'📕 Close weight history notebook';});
