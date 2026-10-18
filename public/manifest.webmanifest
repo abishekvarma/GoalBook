@@ -1,0 +1,11 @@
+{
+  "name": "Project Physique 40",
+  "short_name": "Physique 40",
+  "description": "Personal fitness, food, workout and physique tracker",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#101411",
+  "theme_color": "#101411",
+  "icons": [{"src":"/icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+}
