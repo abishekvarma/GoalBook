@@ -7,7 +7,7 @@ function save(){try{localStorage.setItem(KEY,JSON.stringify(state));$('saveState
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function todayFoods(){return state.foods.filter(x=>x.date===today())}function sum(items,key){return items.reduce((a,x)=>a+(Number(x[key])||0),0)}function fmt(n){return Math.round(n*10)/10}
 const starter=[
-{name:'Egg, whole, raw',state:'Raw',cal:143,p:12.6,c:0.7,f:9.5},{name:'Chicken breast, skinless, raw',state:'Raw',cal:120,p:22.5,c:0,f:2.6},{name:'Rice, white, raw',state:'Raw',cal:365,p:7.1,c:80,c:80,f:.7},{name:'Rice, white, cooked',state:'Cooked',cal:130,p:2.7,c:28.2,f:.3},{name:'Soya chunks, dry',state:'Raw',cal:345,p:52,c:33,f:0.5},{name:'Lentils, cooked',state:'Cooked',cal:116,p:9,c:20,f:.4},{name:'Banana',state:'Raw',cal:89,p:1.1,c:22.8,f:.3},{name:'Oats, dry',state:'Raw',cal:389,p:16.9,c:66.3,f:6.9},{name:'Milk, whole',state:'Packaged',cal:61,p:3.2,c:4.8,f:3.3},{name:'Potato, boiled',state:'Cooked',cal:87,p:1.9,c:20.1,f:.1},{name:'Peanuts',state:'Raw',cal:567,p:25.8,c:16.1,f:49.2},{name:'Apple',state:'Raw',cal:52,p:.3,c:13.8,f:.2}
+{name:'Egg, whole, raw',state:'Raw',cal:143,p:12.6,c:0.7,f:9.5},{name:'Chicken breast, skinless, raw',state:'Raw',cal:120,p:22.5,c:0,f:2.6},{name:'Rice, white, raw',state:'Raw',cal:365,p:7.1,c:80,f:.7},{name:'Rice, white, cooked',state:'Cooked',cal:130,p:2.7,c:28.2,f:.3},{name:'Soya chunks, dry',state:'Raw',cal:345,p:52,c:33,f:0.5},{name:'Lentils, cooked',state:'Cooked',cal:116,p:9,c:20,f:.4},{name:'Banana',state:'Raw',cal:89,p:1.1,c:22.8,f:.3},{name:'Oats, dry',state:'Raw',cal:389,p:16.9,c:66.3,f:6.9},{name:'Milk, whole',state:'Packaged',cal:61,p:3.2,c:4.8,f:3.3},{name:'Potato, boiled',state:'Cooked',cal:87,p:1.9,c:20.1,f:.1},{name:'Peanuts',state:'Raw',cal:567,p:25.8,c:16.1,f:49.2},{name:'Apple',state:'Raw',cal:52,p:.3,c:13.8,f:.2}
 ];
 function showTab(name){document.querySelectorAll('.panel').forEach(x=>x.classList.toggle('active',x.id===name));document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x.dataset.tab===name));if(name==='food')renderFood();if(name==='workout')renderWorkout();if(name==='progress')renderProgress();window.scrollTo({top:0,behavior:'smooth'})}
 document.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()=>showTab(b.dataset.tab)));document.querySelectorAll('[data-goto]').forEach(b=>b.addEventListener('click',()=>showTab(b.dataset.goto)));
@@ -140,50 +140,70 @@ function planForToday(plan){
  const rest=/\brest\b|recovery/i.test(items.slice(1).map(x=>x.replace(/<[^>]*>/g,'')).join(' '));
  return items.join('')+(rest?'<p class="hint">Recovery day — no strength workout planned.</p>':'');
 }
-$('foodForm').addEventListener('submit',e=>{e.preventDefault();const calories=Number($('foodCalories').value),protein=Number($('foodProtein').value),carbs=Number($('foodCarbs').value),fat=Number($('foodFat').value);if([calories,protein,carbs,fat].some(v=>!Number.isFinite(v)||v<0)){alert('Please check the nutrition values before saving.');return;}state.foods.push({id:crypto.randomUUID(),date:today(),name:$('foodName').value.trim(),grams:Number($('foodGrams').value),state:$('foodState').value,calories,protein,carbs,fat,offPlan:$('foodOffPlan').checked});e.target.reset();$('foodGrams').value=100;$('foodCalories').value=0;$('foodProtein').value=0;$('foodCarbs').value=0;$('foodFat').value=0;$('foodNutritionStatus').textContent='';save()});
-let foodSearchTimer;
-function applyFoodNutrition(food){
-  const grams=Math.max(0,Number($('foodGrams').value)||100),factor=grams/100;
-  $('foodName').value=food.name;$('foodState').value=food.state||'Packaged';
-  $('foodCalories').value=Math.round((food.cal||0)*factor*10)/10;
-  $('foodProtein').value=Math.round((food.p||0)*factor*10)/10;
-  $('foodCarbs').value=Math.round((food.c||0)*factor*10)/10;
-  $('foodFat').value=Math.round((food.f||0)*factor*10)/10;
-  $('foodNutritionStatus').textContent='Nutrition filled for '+grams+' g. Check raw/cooked state and verify unusual or branded foods.';
+function resetFoodFields(){ $('foodForm').reset(); $('foodGrams').value=100; $('foodCalories').value=0; $('foodProtein').value=0; $('foodCarbs').value=0; $('foodFat').value=0; $('foodNutritionStatus').textContent=''; }
+function saveFoodEntry({auto=false}={}){
+ const name=$('foodName').value.trim(),grams=Number($('foodGrams').value),calories=Number($('foodCalories').value),protein=Number($('foodProtein').value),carbs=Number($('foodCarbs').value),fat=Number($('foodFat').value);
+ if(!name||!Number.isFinite(grams)||grams<=0||[calories,protein,carbs,fat].some(v=>!Number.isFinite(v)||v<0)){ $('foodNutritionStatus').textContent='Could not save: check food name, grams and nutrition values.'; return false; }
+ if(auto&&calories===0&&protein===0&&carbs===0&&fat===0){$('foodNutritionStatus').textContent='No nutrition data found for this food. Choose a lookup result first; it will be added automatically.';return false;}
+ state.foods.push({id:crypto.randomUUID(),date:today(),name,grams,state:$('foodState').value,calories,protein,carbs,fat,offPlan:$('foodOffPlan').checked});
+ $('foodNutritionStatus').textContent='✓ Added '+name+' ('+grams+' g) to today’s food log.';
+ resetFoodFields(); save(); return true;
 }
-function nutritionButton(food,index,source){return '<button class="suggestion" data-food-pick="'+index+'" data-food-source="'+source+'"><span>'+esc(food.name)+'<small>'+(food.state||'Packaged')+' · per 100 g</small></span><strong>'+Math.round(food.cal||0)+' kcal</strong></button>'}
+$('foodForm').addEventListener('submit',e=>{e.preventDefault();saveFoodEntry()});
+let foodSearchTimer;
+let selectedFood=null;
+function applyFoodNutrition(food){
+ selectedFood=food;
+ const grams=Math.max(0.1,Number($('foodGrams').value)||100),factor=grams/100;
+ $('foodName').value=food.name;$('foodState').value=food.state||'Packaged';
+ $('foodCalories').value=Math.round((food.cal||0)*factor*10)/10;
+ $('foodProtein').value=Math.round((food.p||0)*factor*10)/10;
+ $('foodCarbs').value=Math.round((food.c||0)*factor*10)/10;
+ $('foodFat').value=Math.round((food.f||0)*factor*10)/10;
+ $('foodNutritionStatus').textContent='Nutrition found for '+grams+' g. Adding this result to today’s log…';
+ saveFoodEntry({auto:true});
+}
+function matchesFoodName(food,q){
+ const norm=x=>x.toLowerCase().replace(/[^a-z0-9 ]/g,' ').replace(/\\s+/g,' ').trim();
+ const n=norm(food.name),query=norm(q);
+ if(n.includes(query))return true;
+ const aliases={'rice white raw':'white rice raw','rice white cooked':'white rice cooked','chicken breast skinless raw':'chicken raw','egg whole raw':'egg raw','soya chunks dry':'soya dry'};
+ if(aliases[n]&&aliases[n].includes(query))return true;
+ return query.split(' ').filter(Boolean).every(word=>n.includes(word));
+}
+function nutritionButton(food,index,source){return '<button type="button" class="suggestion" data-food-pick="'+index+'" data-food-source="'+source+'"><span>'+esc(food.name)+'<small>'+(food.state||'Packaged')+' · per 100 g</small></span><strong>'+Math.round(food.cal||0)+' kcal</strong></button>'}
+function bindFoodPicks(matches,remote=[]){
+ document.querySelectorAll('[data-food-pick]').forEach(b=>b.onclick=()=>{const list=b.dataset.foodSource==='local'?matches:remote;const food=list[Number(b.dataset.foodPick)];if(food)applyFoodNutrition(food);});
+}
 $('foodSearch').addEventListener('input',()=>{
  const q=$('foodSearch').value.trim().toLowerCase();clearTimeout(foodSearchTimer);
- const matches=starter.filter(x=>x.name.toLowerCase().includes(q)).slice(0,8);
+ const matches=q?starter.filter(x=>matchesFoodName(x,q)).slice(0,8):[];
  $('foodSuggestions').innerHTML=q?matches.map((x,i)=>nutritionButton(x,i,'local')).join(''):'Type to search foods';
- document.querySelectorAll('[data-food-pick][data-food-source="local"]').forEach(b=>b.onclick=()=>applyFoodNutrition(matches[Number(b.dataset.foodPick)]));
- if(q.length<3||matches.length){if(q.length<3)return;}
+ bindFoodPicks(matches);
+ if(q.length<2||matches.length)return;
  foodSearchTimer=setTimeout(async()=>{
-  $('foodSuggestions').insertAdjacentHTML('beforeend','<p class="hint">Searching food database…</p>');
+  $('foodSuggestions').insertAdjacentHTML('beforeend','<p class="hint">Searching online nutrition database…</p>');
   try{
    const url='https://world.openfoodfacts.org/cgi/search.pl?search_terms='+encodeURIComponent(q)+'&search_simple=1&action=process&json=1&page_size=8&fields=product_name,nutriments';
    const response=await fetch(url,{headers:{Accept:'application/json'}});
    if(!response.ok)throw new Error('lookup unavailable');
    const data=await response.json();
-   const remote=(data.products||[]).filter(p=>p.product_name&&p.nutriments&&Number.isFinite(Number(p.nutriments['energy-kcal_100g']))).map(p=>({name:p.product_name,state:'Packaged',cal:Number(p.nutriments['energy-kcal_100g'])||0,p:Number(p.nutriments.proteins_100g)||0,c:Number(p.nutriments.carbohydrates_100g)||0,f:Number(p.nutriments.fat_100g)||0}));
-   const valid=remote.slice(0,8);
-   if(valid.length){
-    const current=$('foodSuggestions');
-    const remoteHtml=valid.map((x,i)=>nutritionButton(x,i,'remote')).join('');
-    current.innerHTML=(matches.length?matches.map((x,i)=>nutritionButton(x,i,'local')).join(''):'')+'<p class="hint">Database results · packaged products may differ from plain ingredients.</p>'+remoteHtml;
-    document.querySelectorAll('[data-food-pick]').forEach(b=>b.onclick=()=>{const list=b.dataset.foodSource==='local'?matches:valid;applyFoodNutrition(list[Number(b.dataset.foodPick)])});
-   } else if(!matches.length){$('foodSuggestions').textContent='No matching nutrition data found. Try “white rice raw”, “cooked rice”, or check the package label.';}
-  }catch(_){if(!matches.length)$('foodSuggestions').textContent='Online lookup unavailable. Try the built-in foods or enter values from the food label.';}
+   if($('foodSearch').value.trim().toLowerCase()!==q)return;
+   const remote=(data.products||[]).filter(p=>p.product_name&&p.nutriments&&Number.isFinite(Number(p.nutriments['energy-kcal_100g']))).map(p=>({name:p.product_name,state:'Packaged',cal:Number(p.nutriments['energy-kcal_100g'])||0,p:Number(p.nutriments.proteins_100g)||0,c:Number(p.nutriments.carbohydrates_100g)||0,f:Number(p.nutriments.fat_100g)||0})).slice(0,8);
+   $('foodSuggestions').innerHTML=(matches.length?matches.map((x,i)=>nutritionButton(x,i,'local')).join(''):'')+(remote.length?'<p class="hint">Online product results</p>'+remote.map((x,i)=>nutritionButton(x,i,'remote')).join(''):'');
+   bindFoodPicks(matches,remote);
+   if(!matches.length&&!remote.length)$('foodSuggestions').textContent='No nutrition match found. Try “white rice raw” or “cooked rice”.';
+  }catch(_){if(!matches.length)$('foodSuggestions').textContent='Online lookup unavailable. Try a built-in food or enter nutrition from the label.';}
  },350);
 });
 $('foodGrams').addEventListener('change',()=>{
  const name=$('foodName').value.trim().toLowerCase();
- const item=starter.find(x=>x.name.toLowerCase()===name);
+ const item=starter.find(x=>matchesFoodName(x,name));
  if(item)applyFoodNutrition(item);
 });
 $('foodName').addEventListener('change',()=>{
  const name=$('foodName').value.trim().toLowerCase();
- const item=starter.find(x=>x.name.toLowerCase()===name);
+ const item=starter.find(x=>matchesFoodName(x,name));
  if(item)applyFoodNutrition(item);
 });
 $('clearFoodBtn').onclick=()=>{if(confirm('Clear only today’s food entries?')){state.foods=state.foods.filter(x=>x.date!==today());save()}};
