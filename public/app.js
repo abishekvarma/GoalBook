@@ -24,7 +24,7 @@ function renderTransformation(){
  if($('ultimateGoal'))$('ultimateGoal').value=t.ultimateGoal||'';
  if($('transformationTargetDate'))$('transformationTargetDate').value=state.settings.targetDate||'';
  const startDate=t.startPhoto?.date||'',dayNumber=date=>startDate?Math.max(1,Math.floor((new Date(date+'T12:00:00')-new Date(startDate+'T12:00:00'))/86400000)+1):null;
- const day=t.startPhoto?dayNumber(today()):null,todaySaved=t.dailyPhotos.find(p=>p.date===today());
+ const day=t.startPhoto?dayNumber(today()):null,todaySaved=!!(t.startPhoto&&t.startPhoto.date===today())||t.dailyPhotos.some(p=>p.date===today());
  if($('dailyPhotoDayLabel'))$('dailyPhotoDayLabel').textContent=day?'Today is Day '+day+' · '+dateLabel(today())+'.':'Save your starting photo first; that becomes Day 1.';
  const goalForm=$('goalPhotoForm'),startForm=$('startPhotoForm'),dailyForm=$('dailyPhotoForm');
  if(goalForm){goalForm.style.display=t.goalPhoto?'none':'';if($('goalPhotoStatus'))$('goalPhotoStatus').textContent=t.goalPhoto?'🔒 Your goal photo is locked. View it in Photo Comparisons.':'';}
@@ -32,7 +32,7 @@ function renderTransformation(){
  if(startForm){startForm.style.display=t.startPhoto?'none':'';if($('startPhotoStatus'))$('startPhotoStatus').textContent=t.startPhoto?'🔒 Day 1 is completed and locked. View it in your Photo Diary.':'';}
  if($('startPhotoLocked'))$('startPhotoLocked').hidden=!t.startPhoto;
  if(dailyForm){dailyForm.style.display=(!t.startPhoto||todaySaved)?'none':'';if($('dailyPhotoStatus'))$('dailyPhotoStatus').textContent=todaySaved?'🎉 Day '+day+' completed! Today’s upload is locked. View your Photo Diary.':(!t.startPhoto?'Save Day 1 first to unlock daily photos.':'');}
- if($('dailyPhotoLocked'))$('dailyPhotoLocked').hidden=!todaySaved;
+ if($('dailyPhotoLocked')){$('dailyPhotoLocked').hidden=!todaySaved;const msg=$('dailyPhotoLocked');if(todaySaved)msg.textContent='🐾 Today’s photo is saved! Day '+day+' is complete. Your upload is locked until tomorrow. View Photo Comparisons & Diary below.';}
  if($('goalPhotoPreview'))$('goalPhotoPreview').innerHTML=t.goalPhoto?'<p class="hint">🔒 Goal photo saved and hidden here. Open Photo Comparisons to view it.</p>':'<p class="hint">No goal photo saved yet.</p>';
  if($('startPhotoPreview'))$('startPhotoPreview').innerHTML=t.startPhoto?'<p class="hint">🔒 Day 1 photo saved. Open Photo Diary to view it.</p>':'<p class="hint">No starting photo saved yet.</p>';
  const records=[];if(t.startPhoto)records.push({...t.startPhoto,kind:'Day 1 · Starting photo',day:1});t.dailyPhotos.forEach(p=>records.push({...p,kind:'Day '+dayNumber(p.date),day:dayNumber(p.date)}));records.sort((x,y)=>x.day-y.day);
