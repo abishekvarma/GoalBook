@@ -36,7 +36,7 @@ function parseWorkoutPlan(text){
   if(!day||!line||/^[-_━—]{3,}$/.test(line)||/^(morning|evening):?$/i.test(line)||/^(keep|goal|note|rest)/i.test(line))continue;
   const cleaned=line.replace(/^\d+[.)]\s*/,'').replace(/^[-*•]\s*/,'').trim();
   if(!cleaned)continue;
-  const match=cleaned.match(/^(.*?)\s*[—–-]\s*(\d+)\s*sets?\s*[×x]\s*([^,;(]+(?:-[^,;(]+)?\s*reps?/i);
+  const match=cleaned.match(/^(.*?)\s*[—–-]\s*(\d+)\s*sets?\s*[×x]\s*(.*?)\s*reps?/i);
   if(match){result[day].push({name:match[1].trim(),sets:Number(match[2]),target:match[3].trim(),kind:'strength',weight:0})}
   else if(/walk|cycling|cardio|mobility|stretch|plank/i.test(cleaned)){result[day].push({name:cleaned,sets:1,target:'Complete duration',kind:'activity',weight:0})}
  }
