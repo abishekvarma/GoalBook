@@ -14,7 +14,19 @@ document.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()
 function render(){const fs=todayFoods(),s=state.settings,cal=sum(fs,'calories'),p=sum(fs,'protein');$('todayLabel').textContent=dateLabel(today());$('dashCalories').textContent=Math.round(cal).toLocaleString();$('dashProtein').textContent=fmt(p)+' g';$('calorieTarget').textContent='Target '+s.targetCalories+' kcal';$('remaining').textContent=fmt(Number(s.targetCalories)-cal)+' kcal remaining';$('caloriePercent').textContent=Math.round(cal/Math.max(1,Number(s.targetCalories))*100)+'% of target';$('calorieBar').style.width=Math.min(100,cal/Math.max(1,Number(s.targetCalories))*100)+'%';const latest=[...state.weights].sort((a,b)=>b.date.localeCompare(a.date))[0];$('dashWeight').textContent=latest?latest.weight+' kg':'—';$('weightChange').textContent=latest?'Latest weigh-in':'Add a weigh-in';$('dashWorkout').textContent=state.exercises.some(x=>x.date===today())?'Logged':'Not logged';$('todayFood').innerHTML=fs.length?fs.slice().reverse().map(foodRow).join(''):'No food logged yet.';renderFood();renderWorkout();renderProgress();renderWeeklyPlanCard();$('startingWeight').value=s.startingWeight;$('targetWeight').value=s.targetWeight;$('targetCalories').value=s.targetCalories;$('targetDate').value=s.targetDate||'';$('dietPlan').value=s.dietPlan||'';$('workoutPlan').value=s.workoutPlan||'';renderGuidedToday(s.workoutPlan);renderWorkoutSessionHistory()}
 function foodRow(x){return '<div class="entry"><div><strong>'+esc(x.name)+'</strong><small>'+x.grams+' g · '+esc(x.state)+' · '+dateLabel(x.date)+'</small>'+(x.offPlan?'<span class="off-plan">Outside plan</span>':'')+'</div><div class="entry-right"><strong>'+Math.round(x.calories)+' kcal</strong><small>'+fmt(x.protein)+' g protein</small><button data-delete-food="'+x.id+'">Remove</button></div></div>'}
 function bindDelete(){document.querySelectorAll('[data-delete-food]').forEach(b=>b.onclick=()=>{state.foods=state.foods.filter(x=>x.id!==b.dataset.deleteFood);save()});document.querySelectorAll('[data-delete-exercise]').forEach(b=>b.onclick=()=>{state.exercises=state.exercises.filter(x=>x.id!==b.dataset.deleteExercise);save()});document.querySelectorAll('[data-delete-weight]').forEach(b=>b.onclick=()=>{state.weights=state.weights.filter(x=>x.id!==b.dataset.deleteWeight);save()});document.querySelectorAll('[data-delete-photo]').forEach(b=>b.onclick=()=>{state.photos=state.photos.filter(x=>x.id!==b.dataset.deletePhoto);save()})}
-function renderFood(){const fs=todayFoods();$('foodTotalCal').textContent=Math.round(sum(fs,'calories'))+' kcal';$('foodTotalProtein').textContent=fmt(sum(fs,'protein'))+' g';$('foodTotalCarbs').textContent=fmt(sum(fs,'carbs'))+' g';$('foodTotalFat').textContent=fmt(sum(fs,'fat'))+' g';$('foodEntries').innerHTML=fs.length?fs.slice().reverse().map(foodRow).join(''):'No entries yet.';const week=new Date();week.setDate(week.getDate()-6);const start=week.toLocaleDateString('en-CA');const off=state.foods.filter(x=>x.offPlan&&x.date>=start&&x.date<=today());$('offPlanReport').innerHTML=off.length?'<p>'+off.length+' off-plan item(s) · '+Math.round(sum(off,'calories'))+' kcal total</p>'+off.slice().reverse().map(x=>'<div class="entry"><div>'+esc(x.name)+'<small>'+dateLabel(x.date)+'</small></div><strong>'+Math.round(x.calories)+' kcal</strong></div>').join(''):'No off-plan foods recorded this week.';bindDelete()}
+function renderFood(){
+ const fs=todayFoods(),meals=['Breakfast','Lunch','Dinner','Snacks'],s=state.settings;
+ $('foodTotalCal').textContent=Math.round(sum(fs,'calories'))+' kcal';$('foodTotalProtein').textContent=fmt(sum(fs,'protein'))+' g';$('foodTotalCarbs').textContent=fmt(sum(fs,'carbs'))+' g';$('foodTotalFat').textContent=fmt(sum(fs,'fat'))+' g';
+ if($('foodDiaryCalories'))$('foodDiaryCalories').textContent=Math.round(sum(fs,'calories')).toLocaleString();
+ if($('foodDiaryTarget'))$('foodDiaryTarget').textContent=Number(s.targetCalories)||1900;
+ if($('foodDiaryRemaining'))$('foodDiaryRemaining').textContent=Math.max(0,(Number(s.targetCalories)||1900)-sum(fs,'calories')).toLocaleString()+' kcal left';
+ if($('foodDiaryCalBar'))$('foodDiaryCalBar').style.width=Math.min(100,sum(fs,'calories')/Math.max(1,Number(s.targetCalories)||1900)*100)+'%';
+ for(const [key,label] of [['carbs','Carb'],['fat','Fat'],['protein','Protein']]){const total=sum(fs,key);const el=$('foodDiary'+label);if(el)el.textContent=fmt(total);const bar=$('foodDiary'+label+'Bar');if(bar)bar.style.width='0%';}
+ const host=$('foodMealDiary');if(host)host.innerHTML=meals.map(meal=>{const items=fs.filter(x=>(x.meal||'Breakfast')===meal);return '<section class="food-meal-block"><div class="food-meal-block-head"><h4>'+meal+'</h4><small>'+Math.round(sum(items,'calories'))+' kcal</small></div>'+(items.length?items.map(x=>'<div class="food-meal-item"><div><strong>'+esc(x.name)+'</strong><small>'+x.grams+' g · '+esc(x.state||'')+' · '+fmt(x.protein)+' g protein</small>'+(x.offPlan?'<small class="off-plan">Outside plan</small>':'')+'</div><div><strong>'+Math.round(x.calories)+' kcal</strong><button type="button" data-delete-food="'+x.id+'">Remove</button></div></div>').join(''):'<div class="food-meal-empty">Nothing logged yet</div>')+'</section>'}).join('');
+ $('foodEntries').innerHTML=fs.length?fs.slice().reverse().map(foodRow).join(''):'No entries yet.';
+ const week=new Date();week.setDate(week.getDate()-6);const start=week.toLocaleDateString('en-CA');const off=state.foods.filter(x=>x.offPlan&&x.date>=start&&x.date<=today());
+ $('offPlanReport').innerHTML=off.length?'<p>'+off.length+' off-plan item(s) · '+Math.round(sum(off,'calories'))+' kcal total</p>'+off.slice().reverse().map(x=>'<div class="entry"><div>'+esc(x.name)+'<small>'+dateLabel(x.date)+'</small></div><strong>'+Math.round(x.calories)+' kcal</strong></div>').join(''):'No off-plan foods recorded this week.';bindDelete();
+}
 function renderWorkout(){const xs=state.exercises.filter(x=>x.date===today());$('workoutDay').textContent=new Date().toLocaleDateString(undefined,{weekday:'long'});$('workoutEntries').innerHTML=xs.length?xs.slice().reverse().map(x=>'<div class="entry"><div><strong>'+esc(x.name)+'</strong><small>'+x.sets+' sets · reps '+esc(x.reps)+(x.notes?' · '+esc(x.notes):'')+'</small></div><div class="entry-right"><strong>'+x.weight+' kg</strong><button data-delete-exercise="'+x.id+'">Remove</button></div></div>').join(''):'No exercises logged.';const hist=[...state.exercises].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,12);$('workoutHistory').innerHTML=hist.length?hist.map(x=>'<div class="entry"><div><strong>'+esc(x.name)+'</strong><small>'+dateLabel(x.date)+' · '+x.sets+' sets · '+esc(x.reps)+' reps</small></div><strong>'+x.weight+' kg</strong></div>').join(''):'Your recent exercise history will appear here.';bindDelete()}
 function renderWeightJourney(){
  const goal=state.weightGoal,base=state.dayOneWeight,ws=[...state.weights].sort((a,b)=>a.date.localeCompare(b.date));
@@ -141,71 +153,28 @@ function planForToday(plan){
  return items.join('')+(rest?'<p class="hint">Recovery day — no strength workout planned.</p>':'');
 }
 function resetFoodFields(){ $('foodForm').reset(); $('foodGrams').value=100; $('foodCalories').value=0; $('foodProtein').value=0; $('foodCarbs').value=0; $('foodFat').value=0; $('foodNutritionStatus').textContent=''; }
-function saveFoodEntry({auto=false}={}){
- const name=$('foodName').value.trim(),grams=Number($('foodGrams').value),calories=Number($('foodCalories').value),protein=Number($('foodProtein').value),carbs=Number($('foodCarbs').value),fat=Number($('foodFat').value);
- if(!name||!Number.isFinite(grams)||grams<=0||[calories,protein,carbs,fat].some(v=>!Number.isFinite(v)||v<0)){ $('foodNutritionStatus').textContent='Could not save: check food name, grams and nutrition values.'; return false; }
- if(auto&&calories===0&&protein===0&&carbs===0&&fat===0){$('foodNutritionStatus').textContent='No nutrition data found for this food. Choose a lookup result first; it will be added automatically.';return false;}
- state.foods.push({id:crypto.randomUUID(),date:today(),name,grams,state:$('foodState').value,calories,protein,carbs,fat,offPlan:$('foodOffPlan').checked});
- $('foodNutritionStatus').textContent='✓ Added '+name+' ('+grams+' g) to today’s food log.';
- resetFoodFields(); save(); return true;
+function saveFoodEntry({auto=false,food=null}={}){
+ const name=food?.name||$('foodName').value.trim(),grams=food?.grams||Number($('foodGrams').value),calories=food?.calories??Number($('foodCalories').value),protein=food?.protein??Number($('foodProtein').value),carbs=food?.carbs??Number($('foodCarbs').value),fat=food?.fat??Number($('foodFat').value);
+ if(!name||!Number.isFinite(grams)||grams<=0||[calories,protein,carbs,fat].some(v=>!Number.isFinite(v)||v<0))return false;
+ if(auto&&calories===0&&protein===0&&carbs===0&&fat===0)return false;
+ state.foods.push({id:crypto.randomUUID(),date:today(),name,grams,state:food?.state||$('foodState').value,calories,protein,carbs,fat,meal:food?.meal||$('foodMealSelect')?.value||'Breakfast',offPlan:$('foodOffPlan')?.checked||false});
+ if(!auto)resetFoodFields();save();return true;
 }
 $('foodForm').addEventListener('submit',e=>{e.preventDefault();saveFoodEntry()});
 let foodSearchTimer;
-let selectedFood=null;
-function applyFoodNutrition(food){
- selectedFood=food;
- const grams=Math.max(0.1,Number($('foodGrams').value)||100),factor=grams/100;
- $('foodName').value=food.name;$('foodState').value=food.state||'Packaged';
- $('foodCalories').value=Math.round((food.cal||0)*factor*10)/10;
- $('foodProtein').value=Math.round((food.p||0)*factor*10)/10;
- $('foodCarbs').value=Math.round((food.c||0)*factor*10)/10;
- $('foodFat').value=Math.round((food.f||0)*factor*10)/10;
- $('foodNutritionStatus').textContent='Nutrition found for '+grams+' g. Adding this result to today’s log…';
- saveFoodEntry({auto:true});
+const foodAliases={'white rice':'Rice, white, cooked','boiled rice':'Rice, white, cooked','raw rice':'Rice, white, raw','rice raw':'Rice, white, raw','rice cooked':'Rice, white, cooked','chicken':'Chicken breast, skinless, raw','egg':'Egg, whole, raw','soya':'Soya chunks, dry'};
+function findStarterMatches(q){const norm=x=>x.toLowerCase().replace(/[^a-z0-9 ]/g,' ').replace(/\\s+/g,' ').trim();const query=norm(q);if(!query)return [];const alias=foodAliases[query];if(alias){const exact=starter.find(x=>x.name===alias);if(exact)return [exact];}return starter.filter(x=>{const n=norm(x.name);return n.includes(query)||query.split(' ').filter(Boolean).every(word=>n.includes(word));}).slice(0,8);}
+function foodResultButton(food,index,source){const grams=Number(food.grams)||100;return '<button type="button" class="food-result" data-food-pick="'+index+'" data-food-source="'+source+'"><span class="food-result-main"><strong>'+esc(food.name)+'</strong><small>'+(food.state||'Food')+' · '+grams+' g</small><span class="food-result-cal">'+Math.round((food.cal||0)*grams/100)+' kcal · '+fmt((food.p||0)*grams/100)+' g protein</span></span><span class="food-result-add">+</span></button>';}
+function addNutritionFood(food){const grams=Math.max(.1,Number(food.grams)||100),meal=$('foodMealSelect')?.value||'Breakfast';const item={name:food.name,state:food.state||'Packaged',grams,calories:Math.round((food.cal||0)*grams/100*10)/10,protein:Math.round((food.p||0)*grams/100*10)/10,carbs:Math.round((food.c||0)*grams/100*10)/10,fat:Math.round((food.f||0)*grams/100*10)/10,meal};if(saveFoodEntry({auto:true,food:item})){$('foodSearch').value='';$('foodSuggestions').innerHTML='<p class="hint">✓ Added to '+meal+'. Search for another food.</p>';}}
+function renderFoodResults(q,local,remote=[]){const host=$('foodSuggestions');if(!host)return;const recent=[],seen=new Set();[...state.foods].reverse().forEach(x=>{const k=x.name.toLowerCase();if(!seen.has(k)&&recent.length<5){seen.add(k);const st=starter.find(f=>f.name.toLowerCase()===k);recent.push(st?{...st,grams:x.grams||100}:{name:x.name,state:x.state||'Packaged',grams:x.grams||100,cal:x.grams?Number(x.calories)*100/x.grams:Number(x.calories)||0,p:x.grams?Number(x.protein)*100/x.grams:Number(x.protein)||0,c:x.grams?Number(x.carbs)*100/x.grams:Number(x.carbs)||0,f:x.grams?Number(x.fat)*100/x.grams:Number(x.fat)||0});}});
+ let out='';if(!q&&recent.length)out+='<div class="food-results-heading">Recently logged <small>Tap + to add again</small></div>'+recent.map((x,i)=>foodResultButton(x,i,'recent')).join('');
+ if(q&&local.length)out+='<div class="food-results-heading">Foods</div>'+local.map((x,i)=>foodResultButton(x,i,'local')).join('');if(remote.length)out+='<div class="food-results-heading">Online food results</div>'+remote.map((x,i)=>foodResultButton(x,i,'remote')).join('');
+ host.innerHTML=out||'<p class="hint">'+(q?'No matching food found. Try “white rice”, “cooked rice”, “egg”, or “chicken”.':'Start typing to search, or add a recently logged food.')+'</p>';
+ host.querySelectorAll('[data-food-pick]').forEach(b=>b.onclick=()=>{const list=b.dataset.foodSource==='local'?local:b.dataset.foodSource==='remote'?remote:recent;const food=list[Number(b.dataset.foodPick)];if(food)addNutritionFood(food);});
 }
-function matchesFoodName(food,q){
- const norm=x=>x.toLowerCase().replace(/[^a-z0-9 ]/g,' ').replace(/\\s+/g,' ').trim();
- const n=norm(food.name),query=norm(q);
- if(n.includes(query))return true;
- const aliases={'rice white raw':'white rice raw','rice white cooked':'white rice cooked','chicken breast skinless raw':'chicken raw','egg whole raw':'egg raw','soya chunks dry':'soya dry'};
- if(aliases[n]&&aliases[n].includes(query))return true;
- return query.split(' ').filter(Boolean).every(word=>n.includes(word));
-}
-function nutritionButton(food,index,source){return '<button type="button" class="suggestion" data-food-pick="'+index+'" data-food-source="'+source+'"><span>'+esc(food.name)+'<small>'+(food.state||'Packaged')+' · per 100 g</small></span><strong>'+Math.round(food.cal||0)+' kcal</strong></button>'}
-function bindFoodPicks(matches,remote=[]){
- document.querySelectorAll('[data-food-pick]').forEach(b=>b.onclick=()=>{const list=b.dataset.foodSource==='local'?matches:remote;const food=list[Number(b.dataset.foodPick)];if(food)applyFoodNutrition(food);});
-}
-$('foodSearch').addEventListener('input',()=>{
- const q=$('foodSearch').value.trim().toLowerCase();clearTimeout(foodSearchTimer);
- const matches=q?starter.filter(x=>matchesFoodName(x,q)).slice(0,8):[];
- $('foodSuggestions').innerHTML=q?matches.map((x,i)=>nutritionButton(x,i,'local')).join(''):'Type to search foods';
- bindFoodPicks(matches);
- if(q.length<2||matches.length)return;
- foodSearchTimer=setTimeout(async()=>{
-  $('foodSuggestions').insertAdjacentHTML('beforeend','<p class="hint">Searching online nutrition database…</p>');
-  try{
-   const url='https://world.openfoodfacts.org/cgi/search.pl?search_terms='+encodeURIComponent(q)+'&search_simple=1&action=process&json=1&page_size=8&fields=product_name,nutriments';
-   const response=await fetch(url,{headers:{Accept:'application/json'}});
-   if(!response.ok)throw new Error('lookup unavailable');
-   const data=await response.json();
-   if($('foodSearch').value.trim().toLowerCase()!==q)return;
-   const remote=(data.products||[]).filter(p=>p.product_name&&p.nutriments&&Number.isFinite(Number(p.nutriments['energy-kcal_100g']))).map(p=>({name:p.product_name,state:'Packaged',cal:Number(p.nutriments['energy-kcal_100g'])||0,p:Number(p.nutriments.proteins_100g)||0,c:Number(p.nutriments.carbohydrates_100g)||0,f:Number(p.nutriments.fat_100g)||0})).slice(0,8);
-   $('foodSuggestions').innerHTML=(matches.length?matches.map((x,i)=>nutritionButton(x,i,'local')).join(''):'')+(remote.length?'<p class="hint">Online product results</p>'+remote.map((x,i)=>nutritionButton(x,i,'remote')).join(''):'');
-   bindFoodPicks(matches,remote);
-   if(!matches.length&&!remote.length)$('foodSuggestions').textContent='No nutrition match found. Try “white rice raw” or “cooked rice”.';
-  }catch(_){if(!matches.length)$('foodSuggestions').textContent='Online lookup unavailable. Try a built-in food or enter nutrition from the label.';}
- },350);
-});
-$('foodGrams').addEventListener('change',()=>{
- const name=$('foodName').value.trim().toLowerCase();
- const item=starter.find(x=>matchesFoodName(x,name));
- if(item)applyFoodNutrition(item);
-});
-$('foodName').addEventListener('change',()=>{
- const name=$('foodName').value.trim().toLowerCase();
- const item=starter.find(x=>matchesFoodName(x,name));
- if(item)applyFoodNutrition(item);
-});
+$('foodSearch').addEventListener('input',()=>{const q=$('foodSearch').value.trim().toLowerCase();clearTimeout(foodSearchTimer);const local=findStarterMatches(q);renderFoodResults(q,local);if(q.length<2)return;foodSearchTimer=setTimeout(async()=>{try{const url='https://world.openfoodfacts.org/cgi/search.pl?search_terms='+encodeURIComponent(q)+'&search_simple=1&action=process&json=1&page_size=8&fields=product_name,nutriments';const response=await fetch(url,{headers:{Accept:'application/json'}});if(!response.ok)throw Error('lookup unavailable');const data=await response.json();if($('foodSearch').value.trim().toLowerCase()!==q)return;const remote=(data.products||[]).filter(p=>p.product_name&&p.nutriments&&Number.isFinite(Number(p.nutriments['energy-kcal_100g']))).map(p=>({name:p.product_name,state:'Packaged',cal:Number(p.nutriments['energy-kcal_100g'])||0,p:Number(p.nutriments.proteins_100g)||0,c:Number(p.nutriments.carbohydrates_100g)||0,f:Number(p.nutriments.fat_100g)||0})).slice(0,8);renderFoodResults(q,local,remote);}catch(_){renderFoodResults(q,local);}},300);});
+$('foodMealSelect')?.addEventListener('change',()=>{if(!$('foodSearch').value.trim())renderFoodResults('',[]);});
+$('clearFoodSearch')?.addEventListener('click',()=>{$('foodSearch').value='';renderFoodResults('',[]);$('foodSearch').focus();});
 $('clearFoodBtn').onclick=()=>{if(confirm('Clear only today’s food entries?')){state.foods=state.foods.filter(x=>x.date!==today());save()}};
 $('exerciseForm').addEventListener('submit',e=>{e.preventDefault();state.exercises.push({id:crypto.randomUUID(),date:today(),name:$('exerciseName').value.trim(),sets:Number($('exerciseSets').value),reps:$('exerciseReps').value.trim(),weight:Number($('exerciseWeight').value),notes:$('exerciseNotes').value.trim()});e.target.reset();$('exerciseSets').value=3;$('exerciseReps').value='12, 12, 10';$('exerciseWeight').value=0;save()});$('clearWorkoutBtn').onclick=()=>{if(confirm('Clear today’s workout entries?')){state.exercises=state.exercises.filter(x=>x.date!==today());save()}};
 $('openWeightNotebook')?.addEventListener('click',()=>{const n=$('weightNotebook');n.hidden=!n.hidden;$('openWeightNotebook').textContent=n.hidden?'📘 Open weight history notebook':'📕 Close weight history notebook';});
