@@ -140,6 +140,7 @@ def persist_state(conn, sid, state):
            Json(state.get("workoutSessions",{}))))
 
 @app.get("/")
+@app.get("/api/health")
 @app.get("/health")
 def health():
     try:
@@ -153,6 +154,7 @@ def health():
         raise HTTPException(status_code=503, detail={"ok": False, "database_connected": False,
             "error": "PostgreSQL connection failed. Configure DB_HOST, DB_NAME, DB_USER, DB_PASS and DB_PORT."}) from exc
 
+@app.get("/api/state")
 @app.get("/state")
 def get_state(request: Request, response: Response):
     sid = session_id_for(request)
@@ -169,6 +171,7 @@ def get_state(request: Request, response: Response):
     except Exception as exc:
         raise HTTPException(status_code=503, detail="Cloud database unavailable; local data has not been deleted.") from exc
 
+@app.put("/api/state")
 @app.put("/state")
 def put_state(payload: StatePayload, request: Request, response: Response):
     sid = session_id_for(request)
@@ -181,6 +184,7 @@ def put_state(payload: StatePayload, request: Request, response: Response):
     except Exception as exc:
         raise HTTPException(status_code=503, detail="Cloud save failed; keep the local backup and retry.") from exc
 
+@app.get("/api/verify")
 @app.get("/verify")
 def verify(request: Request, response: Response):
     sid=session_id_for(request)
