@@ -208,6 +208,18 @@ def verify(request: Request, response: Response):
 class PlanRequest(BaseModel):
     plan: str = Field(min_length=1, max_length=12000)
 
+@app.api_route("/{full_path:path}", methods=["GET", "HEAD"])
+def fallback_routes(full_path: str, request: Request):
+    # Vercel may preserve or strip the /api prefix depending on routing.
+    path = "/" + full_path.strip("/")
+    if path.rstrip("/").endswith("/health") or path.rstrip("/") == "/health":
+        return health()
+    if path.rstrip("/").endswith("/verify") or path.rstrip("/") == "/verify":
+        return verify()
+    if path.rstrip("/") in ("/", "/index"):
+        return {"ok": True, "service": "Project Physique 40 API", "hint": "Use /api/health to check database status."}
+    raise HTTPException(status_code=404, detail={"message": "API route not found", "path": request.url.path, "service": "Project Physique 40 API"})
+
 @app.post("/coach")
 def organize_plan(request: PlanRequest):
     text = request.plan.strip()
