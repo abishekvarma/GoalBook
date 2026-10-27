@@ -3,7 +3,12 @@ const $=id=>document.getElementById(id), today=()=>new Date().toLocaleDateString
 const KEY='project-physique-40-v1';
 const blank=()=>({recipes:[],settings:{startingWeight:89,targetWeight:77,targetCalories:1900,targetDate:'',dietPlan:'',workoutPlan:''},foods:[],exercises:[],weights:[],photos:[],workoutSessions:{}});
 let state=load(); state.recipes=state.recipes||[]; state.weightGoal=state.weightGoal??null;state.dayOneWeight=state.dayOneWeight??null; state.transformation=state.transformation||{ultimateGoal:'',goalPhoto:null,startPhoto:null,dailyPhotos:[]}; function load(){try{return {...blank(),...JSON.parse(localStorage.getItem(KEY)||'{}')}}catch{return blank()}}
-function save(){try{localStorage.setItem(KEY,JSON.stringify(state));$('saveState').textContent='Saved on this device · '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});render();return true}catch(e){$('saveState').textContent='⚠️ Not saved: this browser is out of storage. The photo may disappear after refresh. Please export a backup before continuing.';return false}}
+let cloudSaveTimer=null, cloudSaveVersion=0, cloudReady=false, cloudFailed=false;
+function cloudStatus(message,failed=false){const el=$('saveState');if(el){el.textContent=message;el.style.color=failed?'#ff8d82':'';}}
+async function syncCloud(snapshot=state){const version=++cloudSaveVersion;try{const response=await fetch('/api/state',{method:'PUT',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({state:snapshot})});if(!response.ok)throw new Error('Cloud save failed ('+response.status+')');const result=await response.json();if(version===cloudSaveVersion){cloudReady=true;cloudFailed=false;cloudStatus('✓ Saved to PostgreSQL · '+new Date(result.saved_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}));}return true;}catch(e){cloudFailed=true;cloudStatus('⚠ Cloud save failed — local backup kept. Check database connection.',true);return false;}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(state));render();cloudStatus('Saving securely to PostgreSQL…');clearTimeout(cloudSaveTimer);const snapshot=JSON.parse(JSON.stringify(state));cloudSaveTimer=setTimeout(()=>syncCloud(snapshot),250);return true}catch(e){cloudStatus('⚠ Not saved locally. Export a backup before continuing.',true);return false}}
+async function bootCloud(){try{const response=await fetch('/api/state',{credentials:'same-origin'});if(!response.ok)throw new Error('Cloud unavailable');const cloud=await response.json();const local=load();if(cloud.found&&cloud.state){state={...blank(),...cloud.state};state.recipes=state.recipes||[];state.transformation=state.transformation||{ultimateGoal:'',goalPhoto:null,startPhoto:null,dailyPhotos:[]};state.weightGoal=state.weightGoal??null;state.dayOneWeight=state.dayOneWeight??null;localStorage.setItem(KEY,JSON.stringify(state));cloudReady=true;cloudStatus('✓ Loaded saved PostgreSQL data');}else{state=local;await syncCloud(state);}render();}catch(e){state=load();cloudFailed=true;cloudStatus('⚠ PostgreSQL not connected — data remains only on this device.',true);render();}}
+
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function todayFoods(){return state.foods.filter(x=>x.date===today())}function sum(items,key){return items.reduce((a,x)=>a+(Number(x[key])||0),0)}function fmt(n){return Math.round(n*10)/10}
 const starter=[
@@ -276,13 +281,13 @@ function renderWeeklyPlanCard(){
  }else{host.innerHTML=weeklyPlanEditor('');bindWeeklyPlanEditor();}
 }
 function weeklyPlanEditor(saved){
- return '<h3>Weekly workout plan · 40-day challenge</h3><p class="muted">Paste your full Monday–Sunday plan and save it once.</p><label for="weeklyWorkoutPlanText">Full weekly workout plan</label><textarea id="weeklyWorkoutPlanText" rows="18" placeholder="MONDAY — CHEST, SHOULDERS & TRICEPS&#10;1. Incline Dumbbell Press — 3 sets × 8–12 reps&#10;...&#10;SUNDAY — RECOVERY"></textarea><button type="button" id="saveWeeklyWorkoutPlan" class="primary">Save weekly workout plan</button><p id="weeklyWorkoutPlanStatus" class="hint" aria-live="polite">Your plan is saved only in this browser, not in a cloud database.</p>';
+ return '<h3>Weekly workout plan · 40-day challenge</h3><p class="muted">Paste your full Monday–Sunday plan and save it once.</p><label for="weeklyWorkoutPlanText">Full weekly workout plan</label><textarea id="weeklyWorkoutPlanText" rows="18" placeholder="MONDAY — CHEST, SHOULDERS & TRICEPS&#10;1. Incline Dumbbell Press — 3 sets × 8–12 reps&#10;...&#10;SUNDAY — RECOVERY"></textarea><button type="button" id="saveWeeklyWorkoutPlan" class="primary">Save weekly workout plan</button><p id="weeklyWorkoutPlanStatus" class="hint" aria-live="polite">Your plan is saved to your account and PostgreSQL when cloud sync is connected.</p>';
 }
 function bindWeeklyPlanEditor(){
  const box=$('weeklyWorkoutPlanText');if(box)box.value=state.settings.workoutPlan||'';
- const button=$('saveWeeklyWorkoutPlan');if(button)button.onclick=()=>{const plan=box.value.trim();if(!plan){alert('Paste your full Monday–Sunday workout plan first.');return;}state.settings.workoutPlan=plan;try{localStorage.setItem(KEY,JSON.stringify(state));}catch(e){alert('Could not save locally. Export a backup and free browser storage.');return;}render();renderWeeklyPlanCard();};
+ const button=$('saveWeeklyWorkoutPlan');if(button)button.onclick=()=>{const plan=box.value.trim();if(!plan){alert('Paste your full Monday–Sunday workout plan first.');return;}state.settings.workoutPlan=plan;if(!save())return;renderWeeklyPlanCard();};
 }
 
 if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('/sw.js').catch(()=>{});
-render();
+render();bootCloud();
 })();
